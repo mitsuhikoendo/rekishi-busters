@@ -50,7 +50,10 @@ export async function render(root, { lv }) {
   if (next) next.scrollIntoView({ block: 'center' });
 }
 
+let opening = false; // 読み込み中の連打でモーダルが重ならないように
+
 async function onEra(lv, eraId, locked) {
+  if (opening) return;
   if (locked) {
     sfx('wrong');
     openModal(`<p class="center">🔒 ${r('まえの{時代|じだい}をクリアしてね！')}</p><button class="btn" data-close>OK</button>`);
@@ -59,7 +62,21 @@ async function onEra(lv, eraId, locked) {
   sfx('tap');
   const era = ERAS.find((e) => e.id === eraId);
   const st = getStage(lv, eraId);
-  const content = await getStageContent(lv, eraId);
+  let content;
+  opening = true;
+  try {
+    content = await getStageContent(lv, eraId);
+  } catch {
+    content = undefined;
+  } finally {
+    opening = false;
+  }
+  // 読み込み中に別の画面へ移動した
+  if (location.hash !== `#/level/${lv}`) return;
+  if (content === undefined) {
+    openModal(`<p class="center">${r('よみこめなかったよ🙇 {電波|でんぱ}のよいところで もういちど おしてね')}</p><button class="btn" data-close>OK</button>`);
+    return;
+  }
   if (!content) {
     openModal(`<p class="center">このステージは じゅんびちゅう だよ🙇</p><button class="btn" data-close>OK</button>`);
     return;

@@ -66,7 +66,7 @@ async function route() {
 
 load();
 window.addEventListener('hashchange', route);
-document.addEventListener('pointerdown', unlockAudio, { once: true });
+document.addEventListener('pointerdown', unlockAudio);
 route();
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:' && !/[?&]nosw/.test(location.search)) {

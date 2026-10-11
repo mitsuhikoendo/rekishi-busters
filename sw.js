@@ -1,5 +1,6 @@
-// オフライン対応：全ファイルをキャッシュし、ネットにつながるときは裏で更新する
-const VERSION = 'v1';
+// オフライン対応：全ファイルをキャッシュしておき、ネットにつながるときは新しいファイルを使う
+// （ネットワーク優先。古いエンジンと新しいデータが混ざらないように）。リリースごとに VERSION を上げる。
+const VERSION = 'v2';
 const CACHE = `rekishi-busters-${VERSION}`;
 const FILES = [
   './', 'index.html', 'manifest.webmanifest', 'css/style.css',
@@ -33,19 +34,17 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
   e.respondWith(
     caches.open(CACHE).then(async (cache) => {
-      const cached = await cache.match(req, { ignoreSearch: true });
-      const network = fetch(req)
-        .then((res) => {
-          if (res.ok) cache.put(req, res.clone());
-          return res;
-        })
-        .catch(() => null);
-      if (cached) {
-        e.waitUntil(network);
-        return cached;
+      try {
+        const res = await fetch(req);
+        if (res.ok) e.waitUntil(cache.put(req, res.clone()).catch(() => {}));
+        return res;
+      } catch {
+        // オフライン：キャッシュから
+        const cached = await cache.match(req, { ignoreSearch: true });
+        if (cached) return cached;
+        if (req.mode === 'navigate') return (await cache.match('index.html')) || Response.error();
+        return Response.error();
       }
-      const res = await network;
-      return res || (req.mode === 'navigate' ? cache.match('index.html') : Response.error());
     }),
   );
 });

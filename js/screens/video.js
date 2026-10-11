@@ -1,7 +1,7 @@
 // アニメ紙芝居プレイヤー：場面ごとにイラスト＋字幕＋読み上げを自動再生する
 import { getEra } from '../../data/eras.js';
 import { getLevel } from '../../data/levels.js';
-import { getStage, isStageUnlocked, markWatched } from '../state.js';
+import { getStage, isStageUnlocked, isLevelUnlocked, markWatched } from '../state.js';
 import { getStageContent } from '../content.js';
 import { r, go, sleep } from '../ui.js';
 import { speak, stopSpeak, sfx } from '../audio.js';
@@ -10,9 +10,13 @@ import { rubyPlain } from '../ruby.js';
 export async function render(root, { lv, era: eraId }) {
   const era = getEra(eraId);
   const level = getLevel(lv);
-  const content = era && level ? await getStageContent(lv, eraId) : null;
-  if (!content || !isStageUnlocked(lv, eraId)) {
-    go(level ? `#/level/${lv}` : '#/home');
+  if (!era || !level || !isStageUnlocked(lv, eraId)) {
+    go(level && isLevelUnlocked(lv) ? `#/level/${lv}` : '#/home');
+    return;
+  }
+  const content = await getStageContent(lv, eraId).catch(() => null);
+  if (!content) {
+    go(`#/level/${lv}`);
     return;
   }
   const scenes = content.video;

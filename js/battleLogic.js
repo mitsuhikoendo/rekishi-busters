@@ -84,7 +84,15 @@ export class Battle {
       const base = unsolved.length ? unsolved : [...this.questions.keys()];
       let q = shuffleIdx(base.length, this.rand).map((i) => base[i]);
       // 同じ問題が2回つづかないように
-      if (q.length > 1 && q[0] === this.lastQi) q.push(q.shift());
+      if (q[0] === this.lastQi) {
+        if (q.length > 1) {
+          q.push(q.shift());
+        } else if (this.questions.length > 1) {
+          // 未正解が直前の1問だけなら、正解済みの問題を1つはさむ
+          const others = [...this.questions.keys()].filter((i) => i !== this.lastQi);
+          q.unshift(others[Math.floor(this.rand() * others.length)]);
+        }
+      }
       this.queue = q;
     }
     this.currentQi = this.queue.shift();

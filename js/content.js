@@ -5,6 +5,8 @@ export async function loadLevel(lv) {
   lv = Number(lv);
   if (!cache[lv]) {
     cache[lv] = import(`../data/levels/lv${lv}.js`).then((m) => m.default);
+    // 失敗したら（オフライン等）、つぎに呼ばれたときに読みなおせるよう消しておく
+    cache[lv].catch(() => { delete cache[lv]; });
   }
   return cache[lv];
 }

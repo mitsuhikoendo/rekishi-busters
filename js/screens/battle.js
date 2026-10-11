@@ -23,9 +23,13 @@ export async function render(root, params) {
 async function setupStage({ lv, era: eraId }) {
   const era = getEra(eraId);
   const level = getLevel(lv);
-  const content = era && level ? await getStageContent(lv, eraId) : null;
-  if (!content || !isStageUnlocked(lv, eraId)) {
-    go(level ? `#/level/${lv}` : '#/home');
+  if (!era || !level || !isStageUnlocked(lv, eraId)) {
+    go(level && isLevelUnlocked(lv) ? `#/level/${lv}` : '#/home');
+    return null;
+  }
+  const content = await getStageContent(lv, eraId).catch(() => null);
+  if (!content) {
+    go(`#/level/${lv}`);
     return null;
   }
   if (!getStage(lv, eraId).watched) {
@@ -48,7 +52,12 @@ async function setupReview() {
   const due = dueReviews().slice(0, REVIEW_MAX);
   const questions = [];
   for (const d of due) {
-    const c = await getStageContent(d.lv, d.era);
+    let c;
+    try {
+      c = await getStageContent(d.lv, d.era);
+    } catch {
+      continue; // 読み込めなかった（オフライン等）ときは消さずに、こんかいはとばす
+    }
     const q = c?.questions?.[d.qi];
     if (q) questions.push({ ...q, ref: { lv: d.lv, era: d.era, qi: d.qi } });
     else removeReview(d.lv, d.era, d.qi); // データが変わって存在しない問題は消す
@@ -148,9 +157,27 @@ function runBattle(root, setup) {
     enemyWrap.style.setProperty('--near', '0');
   }
 
+  // 動いているタイマー（裏に回ったときに止めて、もどったら残り時間から再開する）
+  let timer = null; // { sec, end, onTimeout } / 止めている間は { sec, left, onTimeout }
+
   function stopTimer() {
     if (timerId) clearInterval(timerId);
     timerId = null;
+    timer = null;
+  }
+
+  function runTimer(sec, leftMs, onTimeout) {
+    const end = Date.now() + leftMs;
+    timer = { sec, end, onTimeout };
+    timerId = setInterval(() => {
+      const left = Math.max(0, end - Date.now());
+      timerBar.style.width = `${(left / (sec * 1000)) * 100}%`;
+      timerBar.classList.toggle('danger', left < 5000);
+      if (left <= 0) {
+        stopTimer();
+        onTimeout();
+      }
+    }, 100);
   }
 
   function startTimer(sec, onTimeout) {
@@ -163,18 +190,33 @@ function runBattle(root, setup) {
       return;
     }
     startApproach(sec);
-    const end = Date.now() + sec * 1000;
     timerBar.style.width = '100%';
-    timerId = setInterval(() => {
-      const left = Math.max(0, end - Date.now());
-      timerBar.style.width = `${(left / (sec * 1000)) * 100}%`;
-      timerBar.classList.toggle('danger', left < 5000);
-      if (left <= 0) {
-        stopTimer();
-        onTimeout();
-      }
-    }, 100);
+    runTimer(sec, sec * 1000, onTimeout);
   }
+
+  function pauseTimer() {
+    if (!timerId || !timer) return;
+    const { sec, end, onTimeout } = timer;
+    clearInterval(timerId);
+    timerId = null;
+    timer = { sec, left: Math.max(0, end - Date.now()), onTimeout };
+    stopApproach();
+  }
+
+  function resumeTimer() {
+    if (timerId || !timer || timer.left === undefined || destroyed) return;
+    const { sec, left, onTimeout } = timer;
+    // 止めた位置から、残り時間で近づきなおす
+    enemyWrap.style.transition = `transform ${left / 1000}s linear`;
+    enemyWrap.style.transform = '';
+    runTimer(sec, left, onTimeout);
+  }
+
+  function onVisibility() {
+    if (document.hidden) pauseTimer();
+    else resumeTimer();
+  }
+  document.addEventListener('visibilitychange', onVisibility);
 
   // ---- 出題 ----
   function ask() {
@@ -251,6 +293,8 @@ function runBattle(root, setup) {
     markChoices(q, btn, ok);
 
     const ev = battle.answer(ok);
+    // 勝ちが決まった時点で保存（「けっかを見る」の前にアプリを閉じても消えないように）
+    if (ev.status === 'win') saveWin();
     if (setup.mode === 'review') {
       if (ok) removeReview(q.ref.lv, q.ref.era, q.ref.qi);
     } else if (!ok) {
@@ -359,20 +403,28 @@ function runBattle(root, setup) {
   }
 
   // ---- 勝ち・負け ----
-  function showWin() {
-    const earned = battle.coins;
-    const st = battle.stars();
+  let winResult = null;
+
+  function saveWin() {
     let newItem = false;
     let levelUnlockedNow = false;
     if (setup.mode === 'stage') {
       const wasNextLevelOpen = setup.lv < LEVEL_COUNT && isLevelUnlocked(setup.lv + 1);
-      ({ newItem } = recordClear(setup.lv, setup.era.id, st, earned));
+      ({ newItem } = recordClear(setup.lv, setup.era.id, battle.stars(), battle.coins));
       levelUnlockedNow = setup.lv < LEVEL_COUNT && !wasNextLevelOpen && isLevelUnlocked(setup.lv + 1);
     } else {
-      addCoins(earned);
+      addCoins(battle.coins);
       touchStreak();
       save();
     }
+    winResult = { newItem, levelUnlockedNow };
+  }
+
+  // 保存ずみの結果を表示するだけ
+  function showWin() {
+    const earned = battle.coins;
+    const st = battle.stars();
+    const { newItem, levelUnlockedNow } = winResult;
     sfx('win');
     confetti();
 
@@ -389,7 +441,7 @@ function runBattle(root, setup) {
         </div>`;
       const idx = ERA_IDS.indexOf(setup.era.id);
       if (idx < ERA_IDS.length - 1) {
-        nextBtn = `<a class="btn big" href="#/video/${setup.lv}/${ERA_IDS[idx + 1]}" data-testid="next-era">つぎの{時代|じだい}へ ▶</a>`;
+        nextBtn = `<a class="btn big" href="#/video/${setup.lv}/${ERA_IDS[idx + 1]}" data-testid="next-era">${r('つぎの{時代|じだい}へ ▶')}</a>`;
       } else if (setup.lv < LEVEL_COUNT) {
         nextBtn = `<a class="btn big" href="#/level/${setup.lv + 1}" data-testid="next-level">レベル${setup.lv + 1}へ ▶</a>`;
       }
@@ -407,7 +459,7 @@ function runBattle(root, setup) {
       </div>`;
     qpanel.innerHTML = `
       <div class="result-actions">
-        ${r(nextBtn)}
+        ${nextBtn}
         <a class="btn ghost" href="${setup.backHref}">${setup.mode === 'stage' ? 'マップへ' : 'ホームへ'}</a>
         ${setup.mode === 'stage' ? '<button class="btn ghost" id="again">🔁 もういちど</button>' : ''}
       </div>`;
@@ -446,6 +498,7 @@ function runBattle(root, setup) {
   return () => {
     destroyed = true;
     stopTimer();
+    document.removeEventListener('visibilitychange', onVisibility);
   };
 }
 

@@ -33,6 +33,10 @@ export function defaultState() {
 
 let state = null;
 
+function isReviewEntry(r) {
+  return !!r && typeof r === 'object' && typeof r.era === 'string' && typeof r.added === 'string';
+}
+
 export function load() {
   let saved = null;
   try {
@@ -40,15 +44,20 @@ export function load() {
   } catch { saved = null; }
   const base = defaultState();
   if (saved && typeof saved === 'object') {
+    const mission = { ...base.mission, ...(saved.mission || {}) };
+    const coins = Number(saved.coins);
     state = {
       ...base,
       ...saved,
       streak: { ...base.streak, ...(saved.streak || {}) },
-      mission: { ...base.mission, ...(saved.mission || {}) },
+      // list が壊れていたら、その日のミッションを選びなおす
+      mission: Array.isArray(mission.list) && mission.list.every((id) => typeof id === 'string')
+        ? mission : base.mission,
       settings: { ...base.settings, ...(saved.settings || {}) },
       stages: saved.stages && typeof saved.stages === 'object' ? saved.stages : {},
       items: Array.isArray(saved.items) ? saved.items : [],
-      review: Array.isArray(saved.review) ? saved.review : [],
+      review: Array.isArray(saved.review) ? saved.review.filter(isReviewEntry) : [],
+      coins: Number.isFinite(coins) && coins >= 0 ? coins : 0,
     };
   } else {
     state = base;
@@ -178,11 +187,16 @@ export function currentStreak(today = todayStr()) {
 }
 
 // ---- きょうのミッション ----
-// その日最初に開いたとき、まだクリアしていないステージを順に3つ選んで固定する。
+// その日最初に開いたとき、いまのレベルでまだクリアしていないステージを順に3つまで選んで固定する。
+// （ロック中のレベルのステージは入れない。レベルの最後では3つに満たないこともある）
 export function getMission(today = todayStr()) {
   const s = getState();
   if (s.mission.date !== today) {
-    const next = allStages().filter((st) => !getStage(st.lv, st.era).cleared).slice(0, MISSION_SIZE);
+    const uncleared = allStages().filter((st) => !getStage(st.lv, st.era).cleared);
+    const lv = uncleared.length ? uncleared[0].lv : null;
+    const next = lv && isLevelUnlocked(lv)
+      ? uncleared.filter((st) => st.lv === lv).slice(0, MISSION_SIZE)
+      : [];
     s.mission = { date: today, list: next.map((st) => stageId(st.lv, st.era)) };
     save();
   }

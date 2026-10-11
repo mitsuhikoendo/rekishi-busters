@@ -9,7 +9,10 @@ function ac() {
     if (!AC) return null;
     ctx = new AC();
   }
-  if (ctx.state === 'suspended') ctx.resume();
+  // iOS は電話・バックグラウンドのあと 'interrupted' になるので、'running' 以外なら起こす
+  if (ctx.state !== 'running') {
+    try { Promise.resolve(ctx.resume()).catch(() => {}); } catch { /* noop */ }
+  }
   return ctx;
 }
 
@@ -63,20 +66,33 @@ function pickVoice() {
   return jaVoice;
 }
 
+// 読み上げの終了イベントが来ないとき（iOS Safari 等）にあきらめるまでの時間
+const SPEAK_MS_PER_CHAR = 250;
+const SPEAK_EXTRA_MS = 3000;
+
 // 読み終わったら resolve する。読み上げできないときは false で resolve。
+// onend が来なくても、文字数から計算した時間がたてば true で resolve する。
 export function speak(text) {
   return new Promise((resolve) => {
     if (!getState().settings.voice || !canSpeak()) return resolve(false);
     try {
       window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(rubyReading(text));
+      const reading = rubyReading(text);
+      const u = new SpeechSynthesisUtterance(reading);
       u.lang = 'ja-JP';
       u.rate = 1.0;
       u.pitch = 1.1;
       const v = pickVoice();
       if (v) u.voice = v;
       let done = false;
-      const finish = (ok) => { if (!done) { done = true; resolve(ok); } };
+      let timeoutId = null;
+      const finish = (ok) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timeoutId);
+        resolve(ok);
+      };
+      timeoutId = setTimeout(() => finish(true), reading.length * SPEAK_MS_PER_CHAR + SPEAK_EXTRA_MS);
       u.onend = () => finish(true);
       u.onerror = () => finish(false);
       window.speechSynthesis.speak(u);
@@ -90,7 +106,7 @@ export function stopSpeak() {
   try { if (canSpeak()) window.speechSynthesis.cancel(); } catch { /* noop */ }
 }
 
-// 最初のタップでAudioContextを起こす（iOS対策）
+// タップのたびにAudioContextを起こす（iOS対策：中断から復帰したあとも鳴るように）
 export function unlockAudio() {
   ac();
 }
