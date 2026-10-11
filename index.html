@@ -16,6 +16,25 @@
 <body>
   <div id="app"></div>
   <div id="modal-root"></div>
-  <script type="module" src="js/main.js"></script>
+  <!-- 起動できなかったときの表示（main.js が動いたら消える）。CSSが読めなくても見えるようにスタイルはここに書く -->
+  <div id="boot" style="position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center;font-weight:800;font-size:18px;color:#fff;background:#2b1d5c">
+    <p id="boot-msg" style="margin:0">よみこみちゅう…</p>
+    <button id="boot-retry" hidden onclick="location.reload()" style="font:inherit;border:0;border-radius:999px;padding:14px 28px;background:#ffcc33;color:#23194a">🔄 もういちど</button>
+  </div>
+  <script>
+    // 電波が悪くて js の読み込みに失敗すると、画面が真っ白のままになるので、メッセージと再読み込みボタンを出す
+    (function () {
+      var boot = document.getElementById('boot');
+      window.rekishiBootFail = function () {
+        if (window.rekishiBooted) return;
+        document.getElementById('boot-msg').textContent = 'よみこめなかったよ🙇 でんぱの よいところで もういちど ひらいてね';
+        document.getElementById('boot-retry').hidden = false;
+        boot.style.display = 'flex';
+      };
+      setTimeout(function () { if (!window.rekishiBooted) boot.style.display = 'flex'; }, 1500);
+      setTimeout(window.rekishiBootFail, 15000);
+    })();
+  </script>
+  <script type="module" src="js/main.js" onerror="rekishiBootFail()"></script>
 </body>
 </html>

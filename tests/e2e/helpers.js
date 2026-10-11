@@ -38,7 +38,15 @@ async function waitPort(port, ms = 10000) {
 // サーバー＋ブラウザを起動。after() で close() を呼ぶこと。
 export async function startEnv() {
   const port = await freePort();
-  const server = spawn('python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1'], { cwd: ROOT, stdio: 'ignore' });
+  // python3 -m http.server と同じサーバー。ただし listen のバックログ（既定 5）を 128 に増やす。
+  // 既定のままだと、1ページで20以上のモジュールを並行して読むときに負荷がかかると ERR_CONNECTION_RESET になり、
+  // アプリが起動せず（#app が空）テストがタイムアウトする（screens.test.js がときどき落ちていた原因）。
+  const py = [
+    'import sys, http.server as h',
+    'h.ThreadingHTTPServer.request_queue_size = 128',
+    "h.test(HandlerClass=h.SimpleHTTPRequestHandler, ServerClass=h.ThreadingHTTPServer, port=int(sys.argv[1]), bind='127.0.0.1')",
+  ].join('\n');
+  const server = spawn('python3', ['-c', py, String(port)], { cwd: ROOT, stdio: 'ignore' });
   await waitPort(port);
   const browser = await chromium.launch();
   const base = `http://127.0.0.1:${port}/index.html?nosw`;
@@ -86,29 +94,31 @@ export async function setDebugDate(page, date) {
   await page.evaluate((d) => localStorage.setItem('rekishi-busters-debug-date', d), date);
 }
 
-// 表示中の問題を data から探す
-export async function currentQuestion(page) {
+// 表示中の問題を data から探す。scope={lv, era} を渡すとそのステージから優先して探す。
+export async function currentQuestion(page, scope) {
   const html = await page.locator('[data-testid=question]').innerHTML();
   const chips = await page.locator('.order-pool .chip').evaluateAll((els) => els.map((e) => e.innerHTML).sort());
-  for (const data of Object.values(LEVEL_DATA)) {
-    for (const st of Object.values(data)) {
-      for (const q of st.questions) {
-        if (!html.endsWith(rubyHtml(q.q))) continue;
-        if (q.type === 'order') {
-          const items = q.items.map(rubyHtml).sort();
-          if (JSON.stringify(items) !== JSON.stringify(chips)) continue;
-        }
-        return q;
-      }
+  const choices = await page.locator('.choices .choice[data-i]').evaluateAll((els) => els.map((e) => e.innerHTML).sort());
+  const stages = [];
+  if (scope?.lv && scope?.era && LEVEL_DATA[scope.lv]?.[scope.era]) stages.push(LEVEL_DATA[scope.lv][scope.era]);
+  for (const data of Object.values(LEVEL_DATA)) stages.push(...Object.values(data));
+  for (const st of stages) {
+    for (const q of st.questions) {
+      if (!html.endsWith(rubyHtml(q.q))) continue;
+      const type = q.type || 'choice';
+      if (type === 'order' && JSON.stringify(q.items.map(rubyHtml).sort()) !== JSON.stringify(chips)) continue;
+      if (type === 'choice' && JSON.stringify(q.choices.map(rubyHtml).sort()) !== JSON.stringify(choices)) continue;
+      if (type === 'tf' && (chips.length || choices.length)) continue;
+      return q;
     }
   }
   throw new Error(`question not found: ${html}`);
 }
 
-// 1問答えてフィードバックが出るまで待つ
-export async function answer(page, correct) {
+// 答えのボタンを押す（フィードバックは待たない）
+export async function clickAnswer(page, correct, scope) {
   await page.waitForSelector('[data-testid=question]');
-  const q = await currentQuestion(page);
+  const q = await currentQuestion(page, scope);
   const type = q.type || 'choice';
   if (type === 'choice') {
     const i = correct ? q.answer : (q.answer + 1) % 4;
@@ -123,6 +133,12 @@ export async function answer(page, correct) {
     for (const i of order) await page.click(`.order-pool .chip[data-i="${i}"]`);
     await page.click('#order-ok');
   }
+  return q;
+}
+
+// 1問答えてフィードバックが出るまで待つ
+export async function answer(page, correct, scope) {
+  const q = await clickAnswer(page, correct, scope);
   await page.waitForSelector('[data-testid=feedback]', { timeout: 10000 });
   return q;
 }

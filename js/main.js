@@ -64,6 +64,10 @@ async function route() {
   }
 }
 
+// 起動できたので、index.html の「よみこみちゅう／よみこめなかった」表示を消す
+window.rekishiBooted = true;
+document.getElementById('boot')?.remove();
+
 load();
 window.addEventListener('hashchange', route);
 document.addEventListener('pointerdown', unlockAudio);

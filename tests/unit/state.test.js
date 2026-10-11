@@ -120,6 +120,18 @@ describe('きょうのミッション', () => {
     assert.equal(m[0].era, 'jomon');
     assert.deepEqual(S.splitId('12-heian'), [12, 'heian']);
   });
+  // BUG-012: ロック中のレベルのステージはミッションに入らない
+  test('レベルの終わりでは、次のレベル（ロック中）のステージを入れない', () => {
+    clearLevel(1, ERA_IDS.length - 2); // 13時代クリア
+    const m = S.getMission('2026-10-11');
+    assert.deepEqual(m.map((x) => x.id), [`1-${ERA_IDS.at(-1)}`]);
+  });
+  test('レベルを全クリアした翌日は、次のレベルのステージになる', () => {
+    clearLevel(1);
+    const m = S.getMission('2026-10-12');
+    assert.deepEqual(m.map((x) => x.id), ['2-jomon', '2-yayoi', '2-kofun']);
+    assert.ok(m.every((x) => S.isLevelUnlocked(x.lv)));
+  });
   test('全クリアなら空', () => {
     for (let lv = 1; lv <= LEVEL_COUNT; lv++) clearLevel(lv);
     assert.deepEqual(S.getMission('2026-10-11'), []);

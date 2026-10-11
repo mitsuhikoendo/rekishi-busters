@@ -79,7 +79,7 @@ test('攻撃アニメの途中で抜けてもエラーにならず、次の画�
   const q = await page.evaluate(() => document.querySelector('[data-testid=question]').innerHTML);
   assert.ok(q);
   // 1つめの選択肢を押してすぐ戻る（正誤どちらでもアニメ中）
-  await page.locator('.qpanel button').first().click();
+  await page.locator('.qpanel button:enabled').first().click(); // 並べかえの空の枠（disabled）はとばす
   await page.click('.battle-hud .back');
   await page.waitForURL(/#\/level\/1$/);
   await page.waitForTimeout(3500);
@@ -94,7 +94,7 @@ test('アニメ中に「もういちど」バトルへ入りなおしても、�
   await startBattle(page);
   await answer(page, false);
   await page.click('[data-testid=next]');
-  await page.locator('.qpanel button').first().click();
+  await page.locator('.qpanel button:enabled').first().click(); // 並べかえの空の枠（disabled）はとばす
   // アニメ中に同じバトルへ入りなおす
   await page.evaluate(() => { location.hash = '#/level/1'; });
   await page.evaluate(() => { location.hash = '#/battle/1/jomon'; });

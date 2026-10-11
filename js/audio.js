@@ -1,6 +1,6 @@
 // 効果音（Web Audioで合成）とナレーション（SpeechSynthesis）
 import { getState } from './state.js';
-import { rubyReading } from './ruby.js';
+import { rubySpeech } from './ruby.js';
 
 let ctx = null;
 function ac() {
@@ -61,9 +61,19 @@ function pickVoice() {
   if (jaVoice !== undefined) return jaVoice;
   const voices = window.speechSynthesis.getVoices();
   if (!voices.length) return null; // まだ読み込み中
-  jaVoice = voices.find((v) => v.lang === 'ja-JP' && /Kyoko|O-ren|Google/.test(v.name))
-    || voices.find((v) => v.lang && v.lang.startsWith('ja')) || null;
+  const ja = voices.filter((v) => v.lang && v.lang.replace('_', '-').startsWith('ja'));
+  // 高品質な音声（拡張・プレミアム）→ 定番の音声 → そのほかの日本語音声 の順に選ぶ
+  jaVoice = ja.find((v) => /Enhanced|Premium|拡張|プレミアム|Natural/.test(v.name))
+    || ja.find((v) => /Kyoko|O-ren|Google/.test(v.name))
+    || ja[0] || null;
   return jaVoice;
+}
+
+// 音声の一覧はあとから読み込まれることがあるので、変わったら選びなおす
+if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+  try {
+    window.speechSynthesis.addEventListener('voiceschanged', () => { jaVoice = undefined; });
+  } catch { /* noop */ }
 }
 
 // 読み上げの終了イベントが来ないとき（iOS Safari 等）にあきらめるまでの時間
@@ -77,11 +87,11 @@ export function speak(text) {
     if (!getState().settings.voice || !canSpeak()) return resolve(false);
     try {
       window.speechSynthesis.cancel();
-      const reading = rubyReading(text);
+      const reading = rubySpeech(text);
       const u = new SpeechSynthesisUtterance(reading);
       u.lang = 'ja-JP';
       u.rate = 1.0;
-      u.pitch = 1.1;
+      u.pitch = 1.0;
       const v = pickVoice();
       if (v) u.voice = v;
       let done = false;

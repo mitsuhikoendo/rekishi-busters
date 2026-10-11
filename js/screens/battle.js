@@ -113,6 +113,7 @@ function runBattle(root, setup) {
   const enemyWrap = $('#enemy-wrap');
   const enemyEl = $('#enemy');
   const qpanel = $('#qpanel');
+  const screenEl = $('.battle-screen');
   const timerBar = $('#timer-bar');
 
   function drawHud() {
@@ -239,17 +240,21 @@ function runBattle(root, setup) {
         </div>`;
     } else if (type === 'order') {
       const opts = shuffle(q.items.map((c, i) => ({ c, i })));
-      body = `<div class="order-slots" id="slots">${q.items.map((_, i) => `<span class="slot">${i + 1}</span>`).join('')}</div>
+      body = `<div class="order-slots" id="slots">${q.items.map((_, i) => `<button class="slot" data-pos="${i}" disabled>${i + 1}</button>`).join('')}</div>
         <div class="order-pool">${opts.map((o) => `<button class="chip" data-i="${o.i}">${r(o.c)}</button>`).join('')}</div>
+        <p class="order-hint">まちがえたら、ならべたことばをタップするとはずせるよ</p>
         <div class="order-actions">
-          <button class="btn ghost small" id="order-reset">やりなおす</button>
-          <button class="btn small" id="order-ok" disabled>けってい！</button>
-        </div>`;
+          <button class="btn small order-sub" id="order-undo" disabled data-testid="order-undo">↩️ 1つもどす</button>
+          <button class="btn small order-sub" id="order-reset" disabled data-testid="order-reset">🔄 リセット</button>
+        </div>
+        <button class="btn order-ok" id="order-ok" disabled data-testid="order-ok">けってい！</button>`;
     }
     qpanel.innerHTML = `
       <div class="qtext" data-testid="question">${type === 'order' ? '<span class="qtag">ならべかえ</span>' : type === 'tf' ? '<span class="qtag">○×</span>' : ''}${r(q.q)}</div>
       ${body}`;
     qpanel.dataset.type = type;
+    // 並べかえは高さが要るので、アリーナを小さくする
+    screenEl.classList.toggle('is-order', type === 'order');
 
     if (type === 'choice') {
       qpanel.querySelectorAll('.choice').forEach((b) => b.addEventListener('click', () => submit(Number(b.dataset.i), b)));
@@ -259,22 +264,50 @@ function runBattle(root, setup) {
       const picked = [];
       const slots = [...qpanel.querySelectorAll('.slot')];
       const okBtn = qpanel.querySelector('#order-ok');
+      const undoBtn = qpanel.querySelector('#order-undo');
+      const resetBtn = qpanel.querySelector('#order-reset');
       const chips = [...qpanel.querySelectorAll('.chip')];
+      const chipOf = (i) => chips.find((c) => Number(c.dataset.i) === i);
+      // 選んだ順番（picked）にあわせて、枠・ことば・ボタンの状態をかきなおす
+      const redraw = () => {
+        slots.forEach((sl, pos) => {
+          const i = picked[pos];
+          const filled = i !== undefined;
+          sl.innerHTML = filled ? chipOf(i).innerHTML : String(pos + 1);
+          sl.classList.toggle('filled', filled);
+          sl.disabled = !filled;
+        });
+        chips.forEach((c) => { c.disabled = picked.includes(Number(c.dataset.i)); });
+        undoBtn.disabled = resetBtn.disabled = picked.length === 0;
+        okBtn.disabled = picked.length !== q.items.length;
+      };
       chips.forEach((c) => c.addEventListener('click', () => {
         if (locked || c.disabled) return;
         sfx('tap');
         picked.push(Number(c.dataset.i));
-        slots[picked.length - 1].innerHTML = c.innerHTML;
-        slots[picked.length - 1].classList.add('filled');
-        c.disabled = true;
-        okBtn.disabled = picked.length !== q.items.length;
+        redraw();
+        // 小さい画面でも、全部ならべたら「けってい！」が見えるように
+        if (picked.length === q.items.length) okBtn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       }));
-      qpanel.querySelector('#order-reset').addEventListener('click', () => {
-        if (locked) return;
+      // ならべたことばをタップすると、その1つだけはずす
+      slots.forEach((sl) => sl.addEventListener('click', () => {
+        const pos = Number(sl.dataset.pos);
+        if (locked || pos >= picked.length) return;
+        sfx('tap');
+        picked.splice(pos, 1);
+        redraw();
+      }));
+      undoBtn.addEventListener('click', () => {
+        if (locked || !picked.length) return;
+        sfx('tap');
+        picked.pop();
+        redraw();
+      });
+      resetBtn.addEventListener('click', () => {
+        if (locked || !picked.length) return;
+        sfx('tap');
         picked.length = 0;
-        slots.forEach((s, i) => { s.textContent = i + 1; s.classList.remove('filled'); });
-        chips.forEach((c) => { c.disabled = false; });
-        okBtn.disabled = true;
+        redraw();
       });
       okBtn.addEventListener('click', () => submit([...picked], okBtn));
     }
@@ -387,6 +420,7 @@ function runBattle(root, setup) {
 
   function showFeedback(q, ok, timeout, ev) {
     const head = ok ? '⭕ せいかい！' : timeout ? '⏰ じかんぎれ…' : '❌ ざんねん…';
+    screenEl.classList.remove('is-order');
     qpanel.innerHTML = `
       <div class="feedback ${ok ? 'ok' : 'ng'}" data-testid="feedback">
         <div class="fb-head">${head}</div>
@@ -460,8 +494,10 @@ function runBattle(root, setup) {
     qpanel.innerHTML = `
       <div class="result-actions">
         ${nextBtn}
-        <a class="btn ghost" href="${setup.backHref}">${setup.mode === 'stage' ? 'マップへ' : 'ホームへ'}</a>
-        ${setup.mode === 'stage' ? '<button class="btn ghost" id="again">🔁 もういちど</button>' : ''}
+        <div class="result-sub">
+          <a class="btn ghost" href="${setup.backHref}">${setup.mode === 'stage' ? 'マップへ' : 'ホームへ'}</a>
+          ${setup.mode === 'stage' ? '<button class="btn ghost" id="again">🔁 もういちど</button>' : ''}
+        </div>
       </div>`;
     root.querySelector('#again')?.addEventListener('click', () => go(location.hash));
   }
@@ -476,8 +512,10 @@ function runBattle(root, setup) {
     qpanel.innerHTML = `
       <div class="result-actions">
         <button class="btn big" id="retry" data-testid="retry">🔁 もういちど</button>
-        ${setup.mode === 'stage' ? `<a class="btn ghost" href="#/video/${setup.lv}/${setup.era.id}">📺 どうがを見なおす</a>` : ''}
-        <a class="btn ghost" href="${setup.backHref}">もどる</a>
+        <div class="result-sub">
+          ${setup.mode === 'stage' ? `<a class="btn ghost" href="#/video/${setup.lv}/${setup.era.id}">📺 どうがを見なおす</a>` : ''}
+          <a class="btn ghost" href="${setup.backHref}">もどる</a>
+        </div>
       </div>`;
     root.querySelector('#retry').addEventListener('click', () => go(location.hash));
   }

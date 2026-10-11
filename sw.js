@@ -1,6 +1,8 @@
 // オフライン対応：全ファイルをキャッシュしておき、ネットにつながるときは新しいファイルを使う
 // （ネットワーク優先。古いエンジンと新しいデータが混ざらないように）。リリースごとに VERSION を上げる。
-const VERSION = 'v2';
+// 電波が弱くて応答がおそいときは、NETWORK_TIMEOUT_MS であきらめてキャッシュを使う。
+const VERSION = 'v3';
+const NETWORK_TIMEOUT_MS = 3000;
 const CACHE = `rekishi-busters-${VERSION}`;
 const FILES = [
   './', 'index.html', 'manifest.webmanifest', 'css/style.css',
@@ -32,16 +34,25 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
+  const cacheP = caches.open(CACHE);
+  // 時間切れでキャッシュを返したあとも、届いた新しいファイルはキャッシュに入れておく
+  const network = fetch(req).then(async (res) => {
+    if (res.ok) await (await cacheP).put(req, res.clone()).catch(() => {});
+    return res;
+  });
+  e.waitUntil(network.catch(() => {}));
   e.respondWith(
-    caches.open(CACHE).then(async (cache) => {
+    cacheP.then(async (cache) => {
+      const timeout = new Promise((resolve) => { setTimeout(() => resolve(null), NETWORK_TIMEOUT_MS); });
+      const fast = await Promise.race([network.catch(() => null), timeout]);
+      if (fast) return fast;
+      // オフライン・時間切れ：キャッシュから
+      const cached = await cache.match(req, { ignoreSearch: true });
+      if (cached) return cached;
+      // キャッシュに無いときは、ネットワークの応答を待つ
       try {
-        const res = await fetch(req);
-        if (res.ok) e.waitUntil(cache.put(req, res.clone()).catch(() => {}));
-        return res;
+        return await network;
       } catch {
-        // オフライン：キャッシュから
-        const cached = await cache.match(req, { ignoreSearch: true });
-        if (cached) return cached;
         if (req.mode === 'navigate') return (await cache.match('index.html')) || Response.error();
         return Response.error();
       }

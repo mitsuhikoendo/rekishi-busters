@@ -41,7 +41,8 @@ ruby rt { font-size: .5em; opacity: .85; }
 .btn.big { font-size: 20px; padding: 16px; }
 .btn.small { font-size: 15px; padding: 10px 14px; }
 .btn.ghost { background: rgba(255, 255, 255, .14); color: #fff; box-shadow: none; }
-.modal .btn.ghost { background: #eee9ff; color: var(--ink); }
+/* 白い面（モーダル・バトルの問題パネル）の上では、うすむらさきの背景に濃い文字 */
+.modal .btn.ghost, .qpanel .btn.ghost { background: #eee9ff; color: var(--ink); }
 .btn.battle { background: #ff5468; color: #fff; box-shadow: 0 5px 0 #b3263a; }
 .btn.danger { background: transparent; color: var(--bad); box-shadow: none; text-decoration: underline; font-size: 13px; }
 .btn.disabled, .btn:disabled { opacity: .45; }
@@ -242,13 +243,30 @@ ruby rt { font-size: .5em; opacity: .85; }
 .choice.right { background: #dcfce7; border-color: var(--good); }
 .choice.wrong { background: #ffe1e5; border-color: var(--bad); }
 .choice:disabled { cursor: default; }
-.order-slots { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 10px; }
-.slot { border: 2px dashed #c8bdf5; border-radius: 12px; padding: 8px 10px; color: var(--muted); font-weight: 800; min-height: 42px; line-height: 1.6; }
-.slot.filled { border-style: solid; background: #f3efff; color: var(--ink); }
+/* 並べかえ：制限時間があるので、4項目でもスクロールなしで「けってい！」まで見えるようにつめる */
+.battle-screen.is-order .arena { flex: none; min-height: 0; height: clamp(110px, 20dvh, 190px); margin: 8px 0; }
+.battle-screen.is-order .enemy-wrap { top: 4%; }
+.battle-screen.is-order .enemy { font-size: 64px; }
+.battle-screen.is-order .is-boss .enemy { font-size: 76px; }
+.qpanel[data-type="order"] { padding: 10px 12px; }
+.qpanel[data-type="order"] .qtext { font-size: 16px; line-height: 1.7; margin-bottom: 4px; }
+.order-slots { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 8px; }
+.slot {
+  display: block; width: 100%; text-align: left; border: 2px dashed #c8bdf5; border-radius: 12px; padding: 2px 10px;
+  background: transparent; color: var(--muted); font-weight: 800; min-height: 34px; line-height: 1.5; font-size: 14px;
+}
+.slot:disabled { opacity: 1; cursor: default; }
+.slot.filled { border-style: solid; background: #f3efff; color: var(--ink); cursor: pointer; }
+.slot.filled::after { content: '✕'; float: right; color: var(--muted); font-size: 13px; }
 .order-pool { display: flex; flex-wrap: wrap; gap: 6px; }
-.chip { border: 2px solid #7c4dff; background: #fff; border-radius: 99px; padding: 8px 12px; font-weight: 800; line-height: 1.6; cursor: pointer; color: var(--ink); }
-.chip:disabled { opacity: .3; }
-.order-actions { display: flex; gap: 8px; }
+.chip { border: 2px solid #7c4dff; background: #fff; border-radius: 99px; padding: 2px 12px; font-size: 14px; font-weight: 800; line-height: 1.5; cursor: pointer; color: var(--ink); }
+.chip:disabled { display: none; } /* ならべたことばは枠の中に出るので、下からは消す */
+.order-hint { margin: 6px 0 0; font-size: 11px; color: var(--muted); }
+.order-actions { display: flex; gap: 6px; }
+.order-actions .btn { flex: 1; margin-top: 8px; padding: 8px 4px; font-size: 14px; }
+.btn.order-ok { margin-top: 8px; padding: 10px 16px; }
+.btn.order-sub { background: #eee9ff; color: var(--ink); box-shadow: 0 4px 0 #c8bdf5; }
+.btn.order-sub:disabled { opacity: .4; }
 .feedback .fb-head { font-size: 24px; font-weight: 900; }
 .feedback.ok .fb-head { color: #16a34a; }
 .feedback.ng .fb-head { color: var(--bad); }
@@ -266,6 +284,10 @@ ruby rt { font-size: .5em; opacity: .85; }
 .got { font-weight: 800; margin: 8px 0 4px; }
 .result.lose { display: flex; flex-direction: column; justify-content: center; }
 .result-actions .btn:first-child { margin-top: 0; }
+/* 小さいボタンは横にならべて、結果を見る場所を広くする */
+.result-actions .result-sub { display: flex; gap: 8px; }
+.result-actions .result-sub .btn { flex: 1; margin-top: 10px; padding: 12px 6px; font-size: 16px; }
+.result-actions > .btn:first-child + .result-sub .btn, .result-actions > .result-sub:first-child .btn { margin-top: 10px; }
 
 .item-card {
   position: relative; background: #fff; color: var(--ink); border-radius: 18px; padding: 14px; margin: 6px auto;
@@ -278,6 +300,19 @@ ruby rt { font-size: .5em; opacity: .85; }
 .item-card.big .ic-emoji { font-size: 90px; }
 .ic-name { font-size: 22px; font-weight: 900; }
 .ic-desc { line-height: 1.9; margin-top: 6px; text-align: left; }
+
+/* 背の低い画面（375×667 など）：クリア画面をつめて、アイテムの説明まで全部見えるようにする */
+@media (max-height: 740px) {
+  .result { padding: 8px 12px; }
+  .result h2 { font-size: 22px; margin: 0; }
+  .result-stars { font-size: 30px; line-height: 1.2; }
+  .result-coins { font-size: 18px; }
+  .got { margin: 4px 0 2px; }
+  .result .item-card { padding: 8px 12px; margin-top: 4px; }
+  .result .ic-emoji { font-size: 36px; line-height: 1.1; }
+  .result .ic-name { font-size: 18px; }
+  .result .ic-desc { font-size: 14px; line-height: 1.75; margin-top: 2px; }
+}
 
 /* ---- 図鑑 ---- */
 .zk-level h3 { margin: 18px 0 8px; padding-left: 10px; border-left: 6px solid var(--c); }

@@ -83,13 +83,13 @@ export async function render(root, { lv, era: eraId }) {
       if (my !== token || destroyed) return;
       show(k);
       const text = scenes[k].text;
-      const minMs = 2200;
+      const minMs = 1500;
       const started = Date.now();
       const spoke = await speak(text);
       if (my !== token || destroyed) return;
       const elapsed = Date.now() - started;
       // 読み上げなし（または失敗）のときは文字数に合わせて待つ
-      const wait = spoke ? Math.max(0, minMs - elapsed) + 500 : Math.max(3000, rubyPlain(text).length * 170) - elapsed;
+      const wait = spoke ? Math.max(0, minMs - elapsed) + 250 : Math.max(3000, rubyPlain(text).length * 170) - elapsed;
       await sleep(Math.max(0, wait));
     }
     if (my !== token || destroyed) return;
