@@ -1,13 +1,17 @@
 // アニメ紙芝居プレイヤー：場面ごとにイラスト＋字幕＋読み上げを自動再生する
 import { getEra } from '../../data/eras.js';
-import { getLevel } from '../../data/levels.js';
+import { getLevel, LEVELS } from '../../data/levels.js';
 import { getStage, isStageUnlocked, isLevelUnlocked, markWatched } from '../state.js';
 import { getStageContent } from '../content.js';
 import { r, go, sleep } from '../ui.js';
 import { speak, stopSpeak, sfx } from '../audio.js';
 import { rubyPlain } from '../ruby.js';
 
-export async function render(root, { lv, era: eraId }) {
+export async function render(root, params) {
+  return params.eraMode ? renderEraMode(root, params) : renderStage(root, params);
+}
+
+async function renderStage(root, { lv, era: eraId }) {
   const era = getEra(eraId);
   const level = getLevel(lv);
   if (!era || !level || !isStageUnlocked(lv, eraId)) {
@@ -19,16 +23,60 @@ export async function render(root, { lv, era: eraId }) {
     go(`#/level/${lv}`);
     return;
   }
-  const scenes = content.video;
-  const watchedBefore = getStage(lv, eraId).watched;
+  return play(root, {
+    era,
+    scenes: content.video,
+    sub: `レベル${lv}：${r(content.title || level.title)}`,
+    backHref: `#/level/${lv}`,
+    battleHref: `#/battle/${lv}/${eraId}`,
+    canSkip: getStage(lv, eraId).watched,
+    onFinish: () => markWatched(lv, eraId),
+  });
+}
 
+// 時代べつまとめ：レベルの解放に関係なく見られる。視聴のきろく（watched）はつけない。
+// lv が 'all' なら、レベル1〜6の動画を、レベルの見出しをはさんでつなげて再生する。
+async function renderEraMode(root, { era: eraId, lv }) {
+  const era = getEra(eraId);
+  const lvs = lv === 'all' ? LEVELS.map((l) => l.lv) : [Number(lv)];
+  if (!era || lvs.some((n) => !getLevel(n))) {
+    go(era ? `#/era/${eraId}` : '#/eras');
+    return;
+  }
+  const scenes = [];
+  for (const n of lvs) {
+    const content = await getStageContent(n, eraId).catch(() => null);
+    if (!content) continue;
+    const level = getLevel(n);
+    if (lvs.length > 1) {
+      scenes.push({ art: level.icon, anim: 'pop', text: `レベル${n}「${level.title}」　${content.title}` });
+    }
+    scenes.push(...content.video);
+  }
+  if (!scenes.length) {
+    go(`#/era/${eraId}`);
+    return;
+  }
+  return play(root, {
+    era,
+    scenes,
+    sub: lvs.length > 1 ? r('{時代|じだい}べつまとめ：ぜんぶ（Lv1〜6）') : r(`{時代|じだい}べつまとめ：レベル${lvs[0]}`),
+    backHref: `#/era/${eraId}`,
+    battleHref: `#/erabattle/${eraId}`,
+    battleLabel: '⚔️ まとめバトルへ！',
+    canSkip: false,
+    onFinish: () => {},
+  });
+}
+
+function play(root, { era, scenes, sub, backHref, battleHref, battleLabel = '⚔️ バトルへ！', canSkip, onFinish }) {
   root.innerHTML = `
     <div class="screen video" style="--c:${era.color}">
       <header class="bar-head">
-        <a class="back" href="#/level/${lv}" aria-label="もどる">◀</a>
+        <a class="back" href="${backHref}" aria-label="もどる">◀</a>
         <div>
           <div class="bh-title">📺 ${r(era.name)}</div>
-          <div class="bh-sub">レベル${lv}：${r(content.title || level.title)}</div>
+          <div class="bh-sub">${sub}</div>
         </div>
       </header>
       <div class="stage-frame">
@@ -36,7 +84,7 @@ export async function render(root, { lv, era: eraId }) {
         <div class="scene-caption" id="caption"></div>
         <div class="start-cover" id="cover">
           <button class="btn big" id="start" data-testid="video-start">▶ どうがをはじめる</button>
-          ${watchedBefore ? '<button class="btn ghost" id="skip" data-testid="video-skip">とばしてバトルへ ⏭</button>' : ''}
+          ${canSkip ? '<button class="btn ghost" id="skip" data-testid="video-skip">とばしてバトルへ ⏭</button>' : ''}
         </div>
       </div>
       <div class="scene-dots" id="dots">${scenes.map(() => '<i></i>').join('')}</div>
@@ -47,7 +95,7 @@ export async function render(root, { lv, era: eraId }) {
       </div>
       <div class="video-end hidden" id="end">
         <p>${r('{動画|どうが}おわり！ つぎは バトルだ！')}</p>
-        <button class="btn big battle" id="to-battle" data-testid="video-to-battle">⚔️ バトルへ！</button>
+        <button class="btn big battle" id="to-battle" data-testid="video-to-battle">${battleLabel}</button>
         <button class="btn ghost" id="replay">🔁 もういちど見る</button>
       </div>
     </div>`;
@@ -99,7 +147,7 @@ export async function render(root, { lv, era: eraId }) {
   function finish() {
     playing = false;
     playBtn.textContent = '▶';
-    markWatched(lv, eraId);
+    onFinish();
     sfx('win');
     endBox.classList.remove('hidden');
   }
@@ -115,7 +163,7 @@ export async function render(root, { lv, era: eraId }) {
     root.querySelector('#cover').remove();
     playFrom(0);
   });
-  root.querySelector('#skip')?.addEventListener('click', () => go(`#/battle/${lv}/${eraId}`));
+  root.querySelector('#skip')?.addEventListener('click', () => go(battleHref));
   playBtn.addEventListener('click', () => {
     if (root.querySelector('#cover')) return;
     if (playing) pause();
@@ -131,7 +179,7 @@ export async function render(root, { lv, era: eraId }) {
     stopSpeak();
     if (idx + 1 >= scenes.length) { token++; finish(); } else playFrom(idx + 1);
   });
-  root.querySelector('#to-battle').addEventListener('click', () => go(`#/battle/${lv}/${eraId}`));
+  root.querySelector('#to-battle').addEventListener('click', () => go(battleHref));
   root.querySelector('#replay').addEventListener('click', () => playFrom(0));
 
   show(0);

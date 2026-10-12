@@ -66,6 +66,7 @@ export function render(root) {
       <section class="levels">${levelsHtml}</section>
 
       <nav class="home-nav">
+        <a class="btn big era-btn" href="#/eras" data-testid="eras-btn">📚 ${r('{時代|じだい}べつ まとめ')}<small>${r('1つの{時代|じだい}をレベル1〜6でまとめて{学|まな}ぶ')}</small></a>
         <a class="btn big" href="#/zukan" data-testid="zukan-btn">🎁 アイテム${r('{図鑑|ずかん}')}</a>
         <button class="btn ghost" id="settings-btn" data-testid="settings-btn">⚙️ せってい</button>
       </nav>

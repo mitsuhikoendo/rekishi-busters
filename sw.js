@@ -1,14 +1,14 @@
 // オフライン対応：全ファイルをキャッシュしておき、ネットにつながるときは新しいファイルを使う
 // （ネットワーク優先。古いエンジンと新しいデータが混ざらないように）。リリースごとに VERSION を上げる。
 // 電波が弱くて応答がおそいときは、NETWORK_TIMEOUT_MS であきらめてキャッシュを使う。
-const VERSION = 'v3';
+const VERSION = 'v4';
 const NETWORK_TIMEOUT_MS = 3000;
 const CACHE = `rekishi-busters-${VERSION}`;
 const FILES = [
   './', 'index.html', 'manifest.webmanifest', 'css/style.css',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png',
   'js/main.js', 'js/state.js', 'js/audio.js', 'js/ui.js', 'js/ruby.js', 'js/content.js', 'js/battleLogic.js',
-  'js/screens/home.js', 'js/screens/levelMap.js', 'js/screens/video.js', 'js/screens/battle.js', 'js/screens/zukan.js',
+  'js/screens/home.js', 'js/screens/levelMap.js', 'js/screens/video.js', 'js/screens/battle.js', 'js/screens/zukan.js', 'js/screens/era.js',
   'data/eras.js', 'data/levels.js',
   'data/levels/lv1.js', 'data/levels/lv2.js', 'data/levels/lv3.js',
   'data/levels/lv4.js', 'data/levels/lv5.js', 'data/levels/lv6.js',

@@ -314,6 +314,34 @@ ruby rt { font-size: .5em; opacity: .85; }
   .result .ic-desc { font-size: 14px; line-height: 1.75; margin-top: 2px; }
 }
 
+/* ---- 時代べつまとめ ---- */
+.btn.era-btn { background: #fff; color: var(--ink); box-shadow: 0 5px 0 #c8bdf5; }
+.era-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
+.era-card {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 6px;
+  border-radius: 18px; background: var(--c); box-shadow: var(--shadow); text-align: center;
+}
+.ec-icon { font-size: 34px; }
+.ec-name { font-weight: 900; font-size: 15px; }
+.ec-years { font-size: 11px; opacity: .85; }
+.ec-prog { font-size: 12px; font-weight: 800; background: rgba(0, 0, 0, .2); border-radius: 99px; padding: 0 8px; margin-top: 2px; }
+.era-card .stars { font-size: 13px; }
+.era-actions .btn:first-child { margin-top: 0; }
+.ea-best { margin: 10px 0 0; text-align: center; font-weight: 700; color: var(--muted); }
+.ea-best .stars { color: #f5a400; }
+.era-sec { margin: 18px 0 8px; }
+.era-lv-list { display: flex; flex-direction: column; gap: 8px; }
+.era-lv-row {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 16px;
+  background: #fff; color: var(--ink); border-left: 8px solid var(--c);
+}
+.elr-badge { font-weight: 900; color: var(--c); min-width: 34px; }
+.elr-body { flex: 1; min-width: 0; }
+.elr-theme { font-size: 12px; color: var(--muted); font-weight: 700; }
+.elr-title { font-weight: 800; font-size: 14px; line-height: 1.7; }
+.elr-done { font-size: 18px; }
+.btn.elr-play { width: auto; margin: 0; flex: none; padding: 8px 12px; font-size: 14px; }
+
 /* ---- 図鑑 ---- */
 .zk-level h3 { margin: 18px 0 8px; padding-left: 10px; border-left: 6px solid var(--c); }
 .zk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 8px; }

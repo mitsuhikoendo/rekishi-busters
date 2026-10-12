@@ -45,11 +45,11 @@ function shuffleIdx(n, rand) {
 }
 
 // 敵の列：ザコ2体（時代の人物からボス以外）＋ボス
-export function buildEnemies(era, boss, rand = Math.random) {
+export function buildEnemies(era, boss, rand = Math.random, { minions: count = MINION_COUNT, bossHp = BOSS_HP } = {}) {
   const pool = era.characters.filter((c) => c.name !== boss.name);
   const order = shuffleIdx(pool.length, rand);
-  const minions = order.slice(0, MINION_COUNT).map((i) => ({ ...pool[i], hp: MINION_HP, maxHp: MINION_HP, boss: false }));
-  return [...minions, { ...boss, hp: BOSS_HP, maxHp: BOSS_HP, boss: true }];
+  const minions = order.slice(0, count).map((i) => ({ ...pool[i], hp: MINION_HP, maxHp: MINION_HP, boss: false }));
+  return [...minions, { ...boss, hp: bossHp, maxHp: bossHp, boss: true }];
 }
 
 export class Battle {

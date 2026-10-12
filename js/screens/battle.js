@@ -1,9 +1,10 @@
 // バトル画面：時代の人物が近づいてくる。問題に正解するとその時代の武器でやっつける。
 import { ERA_IDS, getEra } from '../../data/eras.js';
-import { getLevel, LEVEL_COUNT } from '../../data/levels.js';
+import { getLevel, LEVELS, LEVEL_COUNT } from '../../data/levels.js';
+import { ERA_BATTLE_PER_LEVEL } from './era.js';
 import {
   getState, getStage, isStageUnlocked, isLevelUnlocked, recordClear, addReview, removeReview,
-  dueReviews, addCoins, touchStreak, save,
+  dueReviews, addCoins, touchStreak, save, recordEraClear,
 } from '../state.js';
 import { getStageContent } from '../content.js';
 import { Battle, buildEnemies, checkAnswer, correctText, qType, COIN_REVIEW, COIN_BOSS, COIN_MINION } from '../battleLogic.js';
@@ -13,9 +14,13 @@ import { sfx } from '../audio.js';
 const TIME_CHOICE = 25;
 const TIME_ORDER = 45;
 const REVIEW_MAX = 7;
+const ERA_MINIONS = 3;
+const ERA_BOSS_HP = 4;
 
 export async function render(root, params) {
-  const setup = params.review ? await setupReview() : await setupStage(params);
+  const setup = params.review ? await setupReview()
+    : params.eraBattle ? await setupEra(params)
+      : await setupStage(params);
   if (!setup) return;
   return runBattle(root, setup);
 }
@@ -45,6 +50,40 @@ async function setupStage({ lv, era: eraId }) {
     questions: content.questions.map((q, qi) => ({ ...q, ref: { lv, era: eraId, qi } })),
     enemies: buildEnemies(era, content.boss),
     backHref: `#/level/${lv}`,
+  };
+}
+
+// 時代べつまとめバトル：その時代のレベル1〜6の問題から、レベルごとに同じ数ずつ出す。
+// レベルの解放に関係なく遊べる。きろくはレベルとは別（state.eras）に残す。
+async function setupEra({ era: eraId }) {
+  const era = getEra(eraId);
+  if (!era) {
+    go('#/eras');
+    return null;
+  }
+  const questions = [];
+  let boss = null;
+  for (const l of LEVELS) {
+    const c = await getStageContent(l.lv, eraId).catch(() => null);
+    if (!c) continue;
+    boss = c.boss; // いちばん上のレベル（総まとめ）のボスが出てくる
+    const picked = shuffle(c.questions.map((q, qi) => ({ ...q, ref: { lv: l.lv, era: eraId, qi } })))
+      .slice(0, ERA_BATTLE_PER_LEVEL);
+    questions.push(...picked);
+  }
+  if (!questions.length || !boss) {
+    go(`#/era/${eraId}`);
+    return null;
+  }
+  return {
+    mode: 'era',
+    era,
+    color: era.color,
+    title: `${era.name} まとめ`,
+    weapon: era.weapon,
+    questions,
+    enemies: buildEnemies(era, boss, Math.random, { minions: ERA_MINIONS, bossHp: ERA_BOSS_HP }),
+    backHref: `#/era/${eraId}`,
   };
 }
 
@@ -446,6 +485,8 @@ function runBattle(root, setup) {
       const wasNextLevelOpen = setup.lv < LEVEL_COUNT && isLevelUnlocked(setup.lv + 1);
       ({ newItem } = recordClear(setup.lv, setup.era.id, battle.stars(), battle.coins));
       levelUnlockedNow = setup.lv < LEVEL_COUNT && !wasNextLevelOpen && isLevelUnlocked(setup.lv + 1);
+    } else if (setup.mode === 'era') {
+      recordEraClear(setup.era.id, battle.stars(), battle.coins);
     } else {
       addCoins(battle.coins);
       touchStreak();
@@ -485,8 +526,9 @@ function runBattle(root, setup) {
     qpanel.innerHTML = '';
     root.querySelector('.arena').innerHTML = `
       <div class="result" data-testid="result">
-        <h2>🎉 ステージクリア！</h2>
-        ${setup.mode === 'stage' ? `<div class="result-stars">${stars(st)}</div>` : '<p>ふくしゅう かんりょう！</p>'}
+        <h2>🎉 ${setup.mode === 'era' ? 'まとめクリア！' : 'ステージクリア！'}</h2>
+        ${setup.mode === 'review' ? '<p>ふくしゅう かんりょう！</p>' : `<div class="result-stars">${stars(st)}</div>`}
+        ${setup.mode === 'era' ? `<p>${r(`${setup.era.name}マスターに{近|ちか}づいた！`)}</p>` : ''}
         <div class="result-coins">🪙 +${earned}</div>
         ${levelUnlockedNow ? `<div class="level-up">🔓 レベル${setup.lv + 1} かいほう！</div>` : ''}
         ${itemHtml ? `<p class="got">アイテムをゲット！</p>${itemHtml}` : ''}
@@ -495,8 +537,8 @@ function runBattle(root, setup) {
       <div class="result-actions">
         ${nextBtn}
         <div class="result-sub">
-          <a class="btn ghost" href="${setup.backHref}">${setup.mode === 'stage' ? 'マップへ' : 'ホームへ'}</a>
-          ${setup.mode === 'stage' ? '<button class="btn ghost" id="again">🔁 もういちど</button>' : ''}
+          <a class="btn ghost" href="${setup.backHref}">${{ stage: 'マップへ', era: 'まとめへ', review: 'ホームへ' }[setup.mode]}</a>
+          ${setup.mode !== 'review' ? '<button class="btn ghost" id="again">🔁 もういちど</button>' : ''}
         </div>
       </div>`;
     root.querySelector('#again')?.addEventListener('click', () => go(location.hash));
@@ -514,6 +556,7 @@ function runBattle(root, setup) {
         <button class="btn big" id="retry" data-testid="retry">🔁 もういちど</button>
         <div class="result-sub">
           ${setup.mode === 'stage' ? `<a class="btn ghost" href="#/video/${setup.lv}/${setup.era.id}">📺 どうがを見なおす</a>` : ''}
+          ${setup.mode === 'era' ? `<a class="btn ghost" href="#/eravideo/${setup.era.id}/all">📺 まとめて見なおす</a>` : ''}
           <a class="btn ghost" href="${setup.backHref}">もどる</a>
         </div>
       </div>`;

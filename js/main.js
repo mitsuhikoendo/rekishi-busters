@@ -6,6 +6,7 @@ import * as levelMap from './screens/levelMap.js';
 import * as video from './screens/video.js';
 import * as battle from './screens/battle.js';
 import * as zukan from './screens/zukan.js';
+import * as era from './screens/era.js';
 
 const ROUTES = [
   { re: /^#\/home$/, screen: home, keys: [] },
@@ -14,6 +15,10 @@ const ROUTES = [
   { re: /^#\/battle\/(\d)\/([a-z]+)$/, screen: battle, keys: ['lv', 'era'] },
   { re: /^#\/review$/, screen: battle, keys: [], extra: { review: true } },
   { re: /^#\/zukan$/, screen: zukan, keys: [] },
+  { re: /^#\/eras$/, screen: era, keys: [] },
+  { re: /^#\/era\/([a-z]+)$/, screen: era, keys: ['era'] },
+  { re: /^#\/eravideo\/([a-z]+)\/(\d|all)$/, screen: video, keys: ['era', 'lv'], extra: { eraMode: true } },
+  { re: /^#\/erabattle\/([a-z]+)$/, screen: battle, keys: ['era'], extra: { eraBattle: true } },
 ];
 
 const app = document.getElementById('app');
@@ -37,7 +42,7 @@ async function route() {
     if (m) {
       match = r;
       params = { ...(r.extra || {}) };
-      r.keys.forEach((k, i) => { params[k] = k === 'lv' ? Number(m[i + 1]) : m[i + 1]; });
+      r.keys.forEach((k, i) => { params[k] = k === 'lv' && /^\d+$/.test(m[i + 1]) ? Number(m[i + 1]) : m[i + 1]; });
       break;
     }
   }

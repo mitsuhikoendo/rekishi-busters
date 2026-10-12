@@ -28,6 +28,7 @@ export function defaultState() {
     streak: { count: 0, last: null },
     mission: { date: null, list: [] },
     settings: { sound: true, voice: true, timer: true },
+    eras: {},            // 時代べつまとめの記録 era -> { stars, plays }（レベルの進みぐあいとは別）
   };
 }
 
@@ -58,6 +59,8 @@ export function load() {
       items: Array.isArray(saved.items) ? saved.items : [],
       review: Array.isArray(saved.review) ? saved.review.filter(isReviewEntry) : [],
       coins: Number.isFinite(coins) && coins >= 0 ? coins : 0,
+      // 時代べつまとめの機能より前の保存データには eras がないので、空でうめる
+      eras: saved.eras && typeof saved.eras === 'object' && !Array.isArray(saved.eras) ? saved.eras : {},
     };
   } else {
     state = base;
@@ -245,4 +248,30 @@ export function setSetting(key, value) {
 
 export function hasItem(id) {
   return getState().items.includes(id);
+}
+
+// ---- 時代べつまとめ ----
+// レベルの進みぐあい（stages・items）にはふれず、別の記録として残す。
+export function getEraRecord(era) {
+  const rec = getState().eras[era];
+  return {
+    stars: Number(rec?.stars) || 0,
+    plays: Number(rec?.plays) || 0,
+  };
+}
+
+export function recordEraClear(era, stars, coins) {
+  const s = getState();
+  const prev = getEraRecord(era);
+  s.eras[era] = { stars: Math.max(prev.stars, stars), plays: prev.plays + 1 };
+  s.coins += coins;
+  touchStreak();
+  save();
+}
+
+// その時代を、レベルモードでいくつのレベルまでクリアしたか
+export function eraLevelProgress(era) {
+  let n = 0;
+  for (let lv = 1; lv <= LEVEL_COUNT; lv++) if (getStage(lv, era).cleared) n++;
+  return n;
 }
