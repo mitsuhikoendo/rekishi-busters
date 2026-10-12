@@ -2,7 +2,7 @@
 // （ネットワーク優先。古いエンジンと新しいデータが混ざらないように）。リリースごとに VERSION を上げる。
 // 電波が弱くて応答がおそいときは、NETWORK_TIMEOUT_MS であきらめてキャッシュを使う。
 // ブラウザの HTTP キャッシュに残った古いファイルがまざらないよう、install も fetch も HTTP キャッシュを通さずに取りにいく。
-const VERSION = 'v5';
+const VERSION = 'v6';
 const NETWORK_TIMEOUT_MS = 3000;
 const CACHE = `rekishi-busters-${VERSION}`;
 const FILES = [

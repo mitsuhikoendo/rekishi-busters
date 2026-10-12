@@ -196,7 +196,7 @@ ruby rt { font-size: .5em; opacity: .85; }
 }
 .enemy-wrap {
   --near: 0;
-  position: absolute; left: 50%; top: 8%; text-align: center; transform-origin: 50% 0;
+  position: absolute; left: 50%; top: 78px; text-align: center; transform-origin: 50% 0;
   transform: translateX(-50%) scale(calc(.65 + var(--near) * .55)) translateY(calc(var(--near) * 24px));
 }
 .enemy-wrap.lunge .enemy { animation: lunge .4s; }
@@ -210,7 +210,16 @@ ruby rt { font-size: .5em; opacity: .85; }
 @keyframes lunge { 50% { transform: scale(1.5) translateY(30px); } }
 @keyframes spin { to { transform: rotate(720deg); } }
 @keyframes poof { from { transform: scale(1); opacity: 1; } to { transform: scale(2.2); opacity: 0; } }
-.enemy-name { font-weight: 800; background: rgba(0, 0, 0, .45); border-radius: 99px; padding: 2px 12px; display: inline-block; font-size: 16px; }
+/* 敵の名前：おぼえられるように大きく。近づく演出で小さくならないよう、拡大縮小する枠の外におく */
+.enemy-banner {
+  position: absolute; top: 10px; left: 10px; right: 10px; z-index: 2; text-align: center;
+  font-size: clamp(24px, 7.5vw, 32px); font-weight: 900; line-height: 1.5; color: #fff;
+  background: rgba(0, 0, 0, .55); border-radius: 18px; padding: 4px 12px;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, .4); letter-spacing: 1px;
+}
+.enemy-banner rt { font-size: .45em; opacity: 1; }
+.enemy-banner .boss-tag { font-size: 14px; vertical-align: middle; }
+.retry-tag { display: inline-block; background: #fff3c4; color: #8a5a00; border-radius: 10px; padding: 2px 10px; font-weight: 800; font-size: 13px; margin-bottom: 6px; }
 .boss-tag { background: var(--bad); border-radius: 6px; padding: 0 6px; margin-right: 6px; font-size: 12px; }
 .enemy-hp { display: flex; gap: 4px; justify-content: center; margin: 6px 0; }
 .enemy-hp i { width: 26px; height: 9px; border-radius: 4px; background: rgba(0, 0, 0, .3); }
@@ -250,7 +259,8 @@ ruby rt { font-size: .5em; opacity: .85; }
 .choice:disabled { cursor: default; }
 /* 並べかえ：制限時間があるので、4項目でもスクロールなしで「けってい！」まで見えるようにつめる */
 .battle-screen.is-order .arena { flex: none; min-height: 0; height: clamp(110px, 20dvh, 190px); margin: 8px 0; }
-.battle-screen.is-order .enemy-wrap { top: 4%; }
+.battle-screen.is-order .enemy-wrap { top: 52px; }
+.battle-screen.is-order .enemy-banner { top: 6px; font-size: clamp(20px, 6vw, 24px); padding: 2px 10px; }
 .battle-screen.is-order .enemy { font-size: 64px; }
 .battle-screen.is-order .is-boss .enemy { font-size: 76px; }
 .qpanel[data-type="order"] { padding: 10px 12px; }

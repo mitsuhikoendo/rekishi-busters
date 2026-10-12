@@ -135,8 +135,8 @@ function runBattle(root, setup) {
         <div class="enemy-count" id="ecount"></div>
       </header>
       <div class="arena" id="arena">
+        <div class="enemy-banner" id="ename" data-testid="enemy-name"></div>
         <div class="enemy-wrap" id="enemy-wrap">
-          <div class="enemy-name" id="ename"></div>
           <div class="enemy-hp" id="ehp"></div>
           <div class="enemy" id="enemy"></div>
           <div class="speech" id="speech"></div>
@@ -259,9 +259,15 @@ function runBattle(root, setup) {
   document.addEventListener('visibilitychange', onVisibility);
 
   // ---- 出題 ----
-  function ask() {
+  // まちがえた問題は、正解するまで同じ問題をもう一度出す（れんしゅう）。
+  // れんしゅうの答えは、ハート・敵・コイン・ふくしゅうボックスなどに何も反映しない。
+  let current = null; // { qi, retry }
+
+  function ask(retryQi = null) {
     if (destroyed) return;
-    const qi = battle.nextQuestion();
+    const retry = retryQi !== null;
+    const qi = retry ? retryQi : battle.nextQuestion();
+    current = { qi, retry };
     const q = battle.questions[qi];
     locked = false;
     resetApproach();
@@ -289,6 +295,7 @@ function runBattle(root, setup) {
         <button class="btn order-ok" id="order-ok" disabled data-testid="order-ok">けってい！</button>`;
     }
     qpanel.innerHTML = `
+      ${retry ? `<div class="retry-tag" data-testid="retry-tag">🔁 ${r('れんしゅう：もういちど！')}</div>` : ''}
       <div class="qtext" data-testid="question">${type === 'order' ? '<span class="qtag">ならべかえ</span>' : type === 'tf' ? '<span class="qtag">○×</span>' : ''}${r(q.q)}</div>
       ${body}`;
     qpanel.dataset.type = type;
@@ -351,7 +358,13 @@ function runBattle(root, setup) {
       okBtn.addEventListener('click', () => submit([...picked], okBtn));
     }
 
-    startTimer(type === 'order' ? TIME_ORDER : TIME_CHOICE, () => submit(undefined, null, true));
+    if (retry) {
+      // れんしゅうは時間制限なし、敵も近づかない
+      stopTimer();
+      timerBar.parentElement.classList.add('hidden');
+    } else {
+      startTimer(type === 'order' ? TIME_ORDER : TIME_CHOICE, () => submit(undefined, null, true));
+    }
   }
 
   async function submit(response, btn, timeout = false) {
@@ -359,10 +372,20 @@ function runBattle(root, setup) {
     locked = true;
     stopTimer();
     stopApproach();
-    const q = battle.questions[battle.currentQi];
+    const { qi, retry } = current;
+    const q = battle.questions[qi];
     const ok = !timeout && checkAnswer(q, response);
     qpanel.querySelectorAll('button').forEach((b) => { b.disabled = true; });
     markChoices(q, btn, ok);
+
+    if (retry) {
+      // れんしゅう：音だけ鳴らして、何も記録しない
+      sfx(ok ? 'correct' : 'wrong');
+      await sleep(400);
+      if (destroyed) return;
+      showFeedback(q, ok, false, { status: 'playing', qi, retry: true });
+      return;
+    }
 
     const ev = battle.answer(ok);
     // 勝ちが決まった時点で保存（「けっかを見る」の前にアプリを閉じても消えないように）
@@ -458,19 +481,23 @@ function runBattle(root, setup) {
   }
 
   function showFeedback(q, ok, timeout, ev) {
-    const head = ok ? '⭕ せいかい！' : timeout ? '⏰ じかんぎれ…' : '❌ ざんねん…';
+    const head = ok ? (ev.retry ? '⭕ せいかい！ おぼえたね！' : '⭕ せいかい！') : timeout ? '⏰ じかんぎれ…' : '❌ ざんねん…';
+    // まちがえたら（負けが決まったとき以外）、つぎは同じ問題をもう一度
+    const again = !ok && ev.status === 'playing';
+    const label = ev.status !== 'playing' ? 'けっかを見る ▶' : again ? '🔁 もういちど ちょうせん ▶' : 'つぎへ ▶';
     screenEl.classList.remove('is-order');
     qpanel.innerHTML = `
       <div class="feedback ${ok ? 'ok' : 'ng'}" data-testid="feedback">
         <div class="fb-head">${head}</div>
         ${ok ? '' : `<div class="fb-answer">こたえ：<b>${r(correctText(q))}</b></div>`}
         <div class="fb-exp">💡 ${r(q.exp || '')}</div>
-        <button class="btn big" id="next-q" data-testid="next">${ev.status === 'playing' ? 'つぎへ ▶' : 'けっかを見る ▶'}</button>
+        <button class="btn big" id="next-q" data-testid="next">${label}</button>
       </div>`;
     $('#next-q').addEventListener('click', () => {
       sfx('tap');
       if (ev.status === 'win') showWin();
       else if (ev.status === 'lose') showLose();
+      else if (again) ask(ev.qi);
       else ask();
     });
   }
