@@ -36,7 +36,8 @@ async function waitPort(port, ms = 10000) {
 }
 
 // サーバー＋ブラウザを起動。after() で close() を呼ぶこと。
-export async function startEnv() {
+// root：配信するディレクトリ（既定はリポジトリ）。path：URL のディレクトリ部分（例 'app/'）。
+export async function startEnv({ root = ROOT, path = '' } = {}) {
   const port = await freePort();
   // python3 -m http.server と同じサーバー。ただし listen のバックログ（既定 5）を 128 に増やす。
   // 既定のままだと、1ページで20以上のモジュールを並行して読むときに負荷がかかると ERR_CONNECTION_RESET になり、
@@ -46,12 +47,15 @@ export async function startEnv() {
     'h.ThreadingHTTPServer.request_queue_size = 128',
     "h.test(HandlerClass=h.SimpleHTTPRequestHandler, ServerClass=h.ThreadingHTTPServer, port=int(sys.argv[1]), bind='127.0.0.1')",
   ].join('\n');
-  const server = spawn('python3', ['-c', py, String(port)], { cwd: ROOT, stdio: 'ignore' });
+  const server = spawn('python3', ['-c', py, String(port)], { cwd: root, stdio: 'ignore' });
   await waitPort(port);
   const browser = await chromium.launch();
-  const base = `http://127.0.0.1:${port}/index.html?nosw`;
+  const origin = `http://127.0.0.1:${port}`;
+  const base = `${origin}/${path}index.html?nosw`;
   return {
     base,
+    origin,
+    port,
     browser,
     async close() {
       await browser.close().catch(() => {});
@@ -101,6 +105,8 @@ export async function currentQuestion(page, scope) {
   const choices = await page.locator('.choices .choice[data-i]').evaluateAll((els) => els.map((e) => e.innerHTML).sort());
   const stages = [];
   if (scope?.lv && scope?.era && LEVEL_DATA[scope.lv]?.[scope.era]) stages.push(LEVEL_DATA[scope.lv][scope.era]);
+  // lv なしで era だけ渡したとき（まとめバトル）は、その時代の全レベルから探す
+  if (!scope?.lv && scope?.era) for (const data of Object.values(LEVEL_DATA)) if (data[scope.era]) stages.push(data[scope.era]);
   for (const data of Object.values(LEVEL_DATA)) stages.push(...Object.values(data));
   for (const st of stages) {
     for (const q of st.questions) {
@@ -197,4 +203,15 @@ export function progressScript(stages, extra = {}) {
   };
   // リロードで上書きしないよう、最初の1回だけ入れる
   return `if (!sessionStorage.getItem('__seeded')) { localStorage.setItem('rekishi-busters-v1', ${JSON.stringify(JSON.stringify(data))}); sessionStorage.setItem('__seeded', '1'); }`;
+}
+
+// 条件が true になるまで page.evaluate をくり返す。
+// page.waitForFunction に async 関数を渡すと、返った Promise が「真」とみなされてすぐ終わってしまうので、こちらを使う。
+export async function poll(page, fn, arg, { timeout = 30000, what = '' } = {}) {
+  const end = Date.now() + timeout;
+  for (;;) {
+    if (await page.evaluate(fn, arg).catch(() => false)) return;
+    if (Date.now() > end) throw new Error(`待ちきれなかった: ${what}`);
+    await new Promise((r) => setTimeout(r, 200));
+  }
 }

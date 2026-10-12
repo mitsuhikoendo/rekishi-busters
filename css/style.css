@@ -172,6 +172,11 @@ ruby rt { font-size: .5em; opacity: .85; }
 .scene-dots { display: flex; gap: 6px; justify-content: center; margin: 12px 0; }
 .scene-dots i { width: 10px; height: 10px; border-radius: 50%; background: rgba(255, 255, 255, .25); }
 .scene-dots i.on { background: var(--accent); }
+.scene-dots.many { align-items: center; gap: 10px; padding: 0 4px; }
+.scene-dots.many i { display: none; }
+.sd-bar { flex: 1; height: 10px; border-radius: 99px; background: rgba(255, 255, 255, .25); overflow: hidden; }
+.sd-bar span { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 99px; transition: width .3s; }
+.sd-count { flex: none; min-width: 4.5em; text-align: right; font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums; }
 .controls { display: flex; justify-content: center; gap: 18px; }
 .ctl { width: 60px; height: 60px; border-radius: 50%; border: 0; background: rgba(255, 255, 255, .15); font-size: 24px; cursor: pointer; }
 .video-end { text-align: center; margin-top: 10px; font-weight: 800; font-size: 18px; }

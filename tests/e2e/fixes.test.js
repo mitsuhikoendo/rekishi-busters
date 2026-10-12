@@ -1,7 +1,7 @@
 // 修正の確認（BUG-009 裏に回ったときのタイマー、BUG-010 Service Worker のオフライン動作）
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { startEnv, newPage, goto, heartsLeft, progressScript } from './helpers.js';
+import { startEnv, newPage, goto, heartsLeft, progressScript, poll } from './helpers.js';
 
 let env;
 before(async () => { env = await startEnv(); });
@@ -65,12 +65,12 @@ test('Service Worker：一度開いたあとはオフラインでも全レベル
   await page.goto(`${swBase}#/home`);
   await page.waitForFunction(() => !!navigator.serviceWorker?.controller, null, { timeout: 15000 }).catch((e) => { throw new Error(`SW が制御を始めない: ${e.message}`); });
   // install 時のキャッシュが終わるのを待つ
-  await page.waitForFunction(async () => {
+  await poll(page, async () => {
     const keys = await caches.keys();
     if (!keys.length) return false;
     const c = await caches.open(keys[0]);
     return !!(await c.match('data/levels/lv6.js'));
-  }, null, { timeout: 15000 }).catch((e) => { throw new Error(`キャッシュが終わらない: ${e.message}`); });
+  }, null, { timeout: 15000, what: 'install 時のキャッシュ' });
   await context.setOffline(true);
   await page.reload();
   await page.waitForSelector('.home');

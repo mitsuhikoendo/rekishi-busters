@@ -1,7 +1,8 @@
 // オフライン対応：全ファイルをキャッシュしておき、ネットにつながるときは新しいファイルを使う
 // （ネットワーク優先。古いエンジンと新しいデータが混ざらないように）。リリースごとに VERSION を上げる。
 // 電波が弱くて応答がおそいときは、NETWORK_TIMEOUT_MS であきらめてキャッシュを使う。
-const VERSION = 'v4';
+// ブラウザの HTTP キャッシュに残った古いファイルがまざらないよう、install も fetch も HTTP キャッシュを通さずに取りにいく。
+const VERSION = 'v5';
 const NETWORK_TIMEOUT_MS = 3000;
 const CACHE = `rekishi-busters-${VERSION}`;
 const FILES = [
@@ -18,7 +19,7 @@ self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE)
       // 1つ失敗しても他はキャッシュする
-      .then((c) => Promise.all(FILES.map((f) => c.add(f).catch(() => {}))))
+      .then((c) => Promise.all(FILES.map((f) => c.add(new Request(f, { cache: 'reload' })).catch(() => {}))))
       .then(() => self.skipWaiting()),
   );
 });
@@ -36,7 +37,7 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
   const cacheP = caches.open(CACHE);
   // 時間切れでキャッシュを返したあとも、届いた新しいファイルはキャッシュに入れておく
-  const network = fetch(req).then(async (res) => {
+  const network = fetch(req, { cache: 'no-cache' }).then(async (res) => {
     if (res.ok) await (await cacheP).put(req, res.clone()).catch(() => {});
     return res;
   });

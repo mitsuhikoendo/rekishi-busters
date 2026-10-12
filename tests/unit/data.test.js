@@ -130,3 +130,24 @@ test('item 名が全レベルを通して重複しない', () => {
   }
   assert.deepEqual(dups, []);
 });
+
+// BUG-019：まとめバトルはザコ3体（時代の人物からボスを除いて選ぶ）。どのレベルのボスを除いても3人以上いること
+test('全時代で、Lv1〜6 のどのボスを除いても、ザコ候補（characters）が3人以上いる', () => {
+  const short = [];
+  for (const e of ERAS) {
+    for (const [lv, data] of Object.entries(levelData)) {
+      const boss = data[e.id]?.boss;
+      if (!boss) continue;
+      const pool = e.characters.filter((c) => c.name !== boss.name);
+      if (pool.length < 3) short.push(`${e.id}（lv${lv} ボス ${rubyPlain(boss.name)} を除くと ${pool.length}人）`);
+    }
+  }
+  assert.deepEqual(short, []);
+});
+
+test('時代の人物の名前が、時代の中で重複しない', () => {
+  for (const e of ERAS) {
+    const names = e.characters.map((c) => rubyPlain(c.name));
+    assert.equal(new Set(names).size, names.length, e.id);
+  }
+});

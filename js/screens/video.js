@@ -69,7 +69,11 @@ async function renderEraMode(root, { era: eraId, lv }) {
   });
 }
 
+// 場面がこれより多いときは、ドットではなく進みぐあいのバーと「12/43」で表示する（ドットがつぶれるので）
+const MAX_DOTS = 15;
+
 function play(root, { era, scenes, sub, backHref, battleHref, battleLabel = '⚔️ バトルへ！', canSkip, onFinish }) {
+  const many = scenes.length > MAX_DOTS;
   root.innerHTML = `
     <div class="screen video" style="--c:${era.color}">
       <header class="bar-head">
@@ -87,7 +91,9 @@ function play(root, { era, scenes, sub, backHref, battleHref, battleLabel = '⚔
           ${canSkip ? '<button class="btn ghost" id="skip" data-testid="video-skip">とばしてバトルへ ⏭</button>' : ''}
         </div>
       </div>
-      <div class="scene-dots" id="dots">${scenes.map(() => '<i></i>').join('')}</div>
+      <div class="scene-dots ${many ? 'many' : ''}" id="dots">${scenes.map(() => '<i></i>').join('')}${many
+        ? `<span class="sd-bar"><span id="sd-fill"></span></span><span class="sd-count" id="sd-count" data-testid="scene-count"></span>`
+        : ''}</div>
       <div class="controls">
         <button class="ctl" id="prev" aria-label="まえ">⏮</button>
         <button class="ctl" id="play" aria-label="さいせい/ていし">⏸</button>
@@ -120,6 +126,10 @@ function play(root, { era, scenes, sub, backHref, battleHref, battleLabel = '⚔
     art.innerHTML = `${sc.bg ? `<div class="art-bg">${sc.bg}</div>` : ''}<div class="art-main">${sc.art}</div>`;
     caption.innerHTML = `<span>${r(sc.text)}</span>`;
     dots.forEach((d, j) => d.classList.toggle('on', j <= i));
+    if (many) {
+      root.querySelector('#sd-fill').style.width = `${((i + 1) / scenes.length) * 100}%`;
+      root.querySelector('#sd-count').textContent = `${i + 1}/${scenes.length}`;
+    }
   }
 
   async function playFrom(i) {
