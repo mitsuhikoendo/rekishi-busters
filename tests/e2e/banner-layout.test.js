@@ -7,6 +7,8 @@ import { ERAS, ERA_IDS } from '../../data/eras.js';
 import { rubyHtml, rubyPlain } from '../../js/ruby.js';
 
 const SIZES = [{ width: 390, height: 844 }, { width: 375, height: 667 }];
+// 看板の名前は「おぼえられるように大きく」。fitBanner で小さくしても、この大きさ以上は保つ
+const MIN_FONT_PX = 16;
 let env;
 before(async () => { env = await startEnv(); });
 after(async () => { await env?.close(); });
@@ -45,6 +47,8 @@ async function measure(page) {
       coversHp: r.bottom > hp.top + 1,
       coversEnemy: r.bottom > en.top + en.height * 0.25,
       bottom: Math.round(r.bottom), hpTop: Math.round(hp.top), enemyTop: Math.round(en.top),
+      fontPx: parseFloat(getComputedStyle(b).fontSize),
+      scroll: b.classList.contains('scroll'),
     };
   });
 }
@@ -101,14 +105,21 @@ for (const size of SIZES) {
       assert.equal(await page.locator('.battle-screen.is-order').count(), order ? 1 : 0);
       await page.waitForTimeout(300);
       const bad = [];
+      const fonts = [];
       for (const [name, { boss, where }] of NAMES) {
         await setName(page, name, boss);
+        await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r()))); // MutationObserver の fitBanner を待つ
         const m = await measure(page);
+        fonts.push({ name: rubyPlain(name), px: m.fontPx });
+        if (m.scroll) bad.push(`${rubyPlain(name)}（${where}）：小さくしても入らず横スクロール`);
+        if (m.fontPx < MIN_FONT_PX) bad.push(`${rubyPlain(name)}（${where}）：文字が小さすぎる(${m.fontPx}px)`);
         const why = [m.overflowX && '横はみ出し', m.outside && 'アリーナの外', m.coversHp && `HPバーにかぶる(${m.lines}行)`].filter(Boolean);
         if (why.length) bad.push(`${rubyPlain(name)}（${where}）：${why.join('・')}`);
       }
       await setName(page, LONGEST, true);
       await page.screenshot({ path: `${SHOT_DIR}/${size.width}x${size.height}-banner-${order ? 'order' : 'normal'}.png` });
+      fonts.sort((a, b) => a.px - b.px);
+      console.log(`# ${tag}・${mode}：看板の文字がいちばん小さい名前 ${fonts.slice(0, 3).map((f) => `${f.name}=${f.px}px`).join('、')}`);
       assert.deepEqual(bad, [], `${tag}・${mode}`);
       assert.deepEqual(errors, []);
       await context.close();

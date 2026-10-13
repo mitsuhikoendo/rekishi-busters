@@ -277,3 +277,9 @@
 - 対策案：長い名前のときは文字を小さくして1行に収める（文字数でクラスを付ける、`white-space: nowrap` ＋ 縮小）。または、看板の高さに合わせて enemy-wrap を下げる
 - 再現テスト：`tests/e2e/banner-layout.test.js`（6件：両サイズ × 実際のバトル・全86の名前（ふつう）・全86の名前（並べかえ））
 - スクリーンショット：`tests/e2e/screenshots/375x667-banner-longest.png`、`375x667-banner-order.png`
+- 状況：✅ コミット 42be4be で直った。`white-space: nowrap` ＋ JS（`fitBanner`）で、看板の幅に合わせて文字を小さくする方法。`banner-layout.test.js` の6件が通る。全86の名前で、看板の文字がいちばん小さくなるのはザビエルで、390×844 は 21px（並べかえ 22px）、375×667 は 20px（並べかえ 20px）。ほかの名前は 22.5px 以上。テストに「16px 以上・横スクロールにならない」の確認を足した。バトルを出るときに `MutationObserver` と `resize` のリスナーは外されている
+
+### 状況（2026-10-13 最終実行時点）
+
+- コミット 1975dc3 の時点：unit 430件すべて pass。E2E 107件中 100 pass・1 skip・6 fail（すべて BUG-022）
+- コミット 42be4be の時点：unit 430件すべて pass。E2E 107件中 106 pass・1 skip・0 fail（skip は「未作成のレベル」用のテストで、全レベルがそろっているため）
