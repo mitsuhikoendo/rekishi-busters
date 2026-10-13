@@ -2,7 +2,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  startEnv, newPage, goto, watchVideoBySkipping, playBattle, answer, next, heartsLeft, clearStage, setDebugDate,
+  startEnv, newPage, goto, watchVideoBySkipping, playBattle, answer, next, heartsLeft, clearStage, setDebugDate, passRetry,
 } from './helpers.js';
 
 let env;
@@ -68,7 +68,8 @@ test('わざと3回まちがえる→負け画面→リトライでバトルを�
   for (let i = 0; i < 3; i++) {
     await answer(page, false);
     assert.equal(await heartsLeft(page), 2 - i);
-    await next(page);
+    if (i < 2) await passRetry(page); // まちがえたら、れんしゅうを正解で通してから次の問題へ
+    else await next(page);
   }
   await page.waitForSelector('[data-testid=lose]');
   await page.click('[data-testid=retry]');

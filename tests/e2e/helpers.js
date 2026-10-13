@@ -168,17 +168,32 @@ export async function watchVideoBySkipping(page) {
   await page.waitForSelector('[data-testid=video-to-battle]', { state: 'visible' });
 }
 
-// 現在のバトルを最後まで（mistakes 回まちがえてから正解しつづける）
-export async function playBattle(page, { mistakes = 0 } = {}) {
+// まちがえたあとの「🔁 もういちど ちょうせん」→ れんしゅう（同じ問題）を正解で通して、「つぎへ」を押す。
+// フィードバック（まちがい）が出ている状態でよぶ。clock を渡すと、アニメを page.clock で早送りする。
+export async function passRetry(page, { scope, clock = false } = {}) {
+  const label = await page.locator('[data-testid=next]').textContent();
+  if (!label.includes('もういちど')) throw new Error(`まちがえたあとのボタンが「もういちど ちょうせん」でない: ${label}`);
+  await page.click('[data-testid=next]');
+  await page.waitForSelector('[data-testid=retry-tag]');
+  await clickAnswer(page, true, scope);
+  if (clock) await page.clock.runFor(2000);
+  await page.waitForSelector('[data-testid=feedback].ok', { timeout: 10000 });
+  await page.click('[data-testid=next]');
+}
+
+// 現在のバトルを最後まで（mistakes 回まちがえてから正解しつづける）。
+// まちがえたあとは、れんしゅう（同じ問題）を正解で通してから次へ進む。
+export async function playBattle(page, { mistakes = 0, scope } = {}) {
   await page.click('[data-testid=battle-start]');
   let m = 0;
   for (let i = 0; i < 30; i++) {
     const wrong = m < mistakes;
     if (wrong) m++;
-    await answer(page, !wrong);
+    await answer(page, !wrong, scope);
     const label = await page.locator('[data-testid=next]').textContent();
-    await next(page);
-    if (label.includes('けっか')) break;
+    if (label.includes('けっか')) { await next(page); break; }
+    if (wrong) await passRetry(page, { scope });
+    else await next(page);
   }
 }
 

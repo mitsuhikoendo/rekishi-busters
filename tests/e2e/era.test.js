@@ -1,7 +1,7 @@
 // 時代べつまとめ（#/eras・#/era/<era>・#/eravideo・#/erabattle）と、前の保存データの引きつぎ
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { startEnv, newPage, goto, progressScript, LEVEL_DATA, clickAnswer } from './helpers.js';
+import { startEnv, newPage, goto, progressScript, LEVEL_DATA, clickAnswer, passRetry } from './helpers.js';
 import { ERA_IDS } from '../../data/eras.js';
 import { LEGACY_JSON, LEGACY_SAVE, LEGACY_TODAY } from '../fixtures/legacySave.js';
 
@@ -40,8 +40,9 @@ async function playEraBattle(page, era, { mistakes = 0, untilLose = false } = {}
     await page.clock.runFor(5000);
     await page.waitForSelector('[data-testid=feedback]');
     const label = await page.locator('[data-testid=next]').textContent();
-    await page.click('[data-testid=next]');
-    if (label.includes('けっか')) break;
+    if (label.includes('けっか')) { await page.click('[data-testid=next]'); break; }
+    if (wrong) await passRetry(page, { scope: { era }, clock: true }); // れんしゅうを正解で通す
+    else await page.click('[data-testid=next]');
   }
   return seen;
 }

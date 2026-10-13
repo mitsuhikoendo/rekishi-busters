@@ -216,7 +216,9 @@ ruby rt { font-size: .5em; opacity: .85; }
   font-size: clamp(24px, 7.5vw, 32px); font-weight: 900; line-height: 1.5; color: #fff;
   background: rgba(0, 0, 0, .55); border-radius: 18px; padding: 4px 12px;
   text-shadow: 0 2px 0 rgba(0, 0, 0, .4); letter-spacing: 1px;
+  white-space: nowrap; overflow: hidden; /* 1行。入らないときは JS（fitBanner）で文字を小さくする */
 }
+.enemy-banner.scroll { overflow-x: auto; text-align: left; }
 .enemy-banner rt { font-size: .45em; opacity: 1; }
 .enemy-banner .boss-tag { font-size: 14px; vertical-align: middle; }
 .retry-tag { display: inline-block; background: #fff3c4; color: #8a5a00; border-radius: 10px; padding: 2px 10px; font-weight: 800; font-size: 13px; margin-bottom: 6px; }

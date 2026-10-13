@@ -1,7 +1,7 @@
 // 時代べつまとめの画面のレイアウト（390×844 / 375×667）
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { startEnv, goto, clickAnswer } from './helpers.js';
+import { startEnv, goto, clickAnswer, passRetry } from './helpers.js';
 import { horizontalOverflow, lowContrast, shot } from './layoutUtil.js';
 import { LEGACY_JSON, LEGACY_TODAY } from '../fixtures/legacySave.js';
 
@@ -95,7 +95,8 @@ for (const size of SIZES) {
     for (let n = 0; n < 3; n++) {
       await clickAnswer(page, false, { era: 'meiji' });
       await page.clock.runFor(5000);
-      await page.click('[data-testid=next]');
+      if (n < 2) await passRetry(page, { scope: { era: 'meiji' }, clock: true });
+      else await page.click('[data-testid=next]');
     }
     await page.waitForSelector('[data-testid=lose]');
     await page.waitForTimeout(400);

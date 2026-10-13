@@ -14,6 +14,7 @@ import { sfx } from '../audio.js';
 const TIME_CHOICE = 25;
 const TIME_ORDER = 45;
 const REVIEW_MAX = 7;
+const BANNER_MIN_PX = 14; // 敵の名前の看板を小さくするときの下限
 const ERA_MINIONS = 3;
 const ERA_BOSS_HP = 4;
 
@@ -160,6 +161,28 @@ function runBattle(root, setup) {
     $('#ecount').textContent = `👾 ${Math.min(battle.enemyIdx + 1, battle.enemies.length)}/${battle.enemies.length}`;
   }
 
+  // 敵の名前の看板は1行で表示する。入らないときは文字を小さくして看板の幅に合わせる。
+  // 中身が変わったら（drawEnemy など）すぐ、画面サイズや並べかえの切りかえのときも合わせなおす。
+  const banner = $('#ename');
+  function fitBanner() {
+    banner.style.fontSize = '';
+    banner.classList.remove('scroll');
+    const base = parseFloat(getComputedStyle(banner).fontSize);
+    if (banner.scrollWidth <= banner.clientWidth) return;
+    // 文字の幅はほぼ大きさに比例するので、比で小さくしてから、まだ入らなければ1pxずつ
+    let size = Math.max(BANNER_MIN_PX, Math.floor(base * (banner.clientWidth / banner.scrollWidth)));
+    banner.style.fontSize = `${size}px`;
+    while (banner.scrollWidth > banner.clientWidth && size > BANNER_MIN_PX) {
+      size -= 1;
+      banner.style.fontSize = `${size}px`;
+    }
+    // いちばん小さくしても入らないときだけ、省略せずに看板の中で横スクロール
+    if (banner.scrollWidth > banner.clientWidth) banner.classList.add('scroll');
+  }
+  const bannerObserver = new MutationObserver(fitBanner);
+  bannerObserver.observe(banner, { childList: true, subtree: true, characterData: true });
+  window.addEventListener('resize', fitBanner);
+
   function drawEnemy() {
     const en = battle.enemy;
     if (!en) return;
@@ -301,6 +324,7 @@ function runBattle(root, setup) {
     qpanel.dataset.type = type;
     // 並べかえは高さが要るので、アリーナを小さくする
     screenEl.classList.toggle('is-order', type === 'order');
+    fitBanner();
 
     if (type === 'choice') {
       qpanel.querySelectorAll('.choice').forEach((b) => b.addEventListener('click', () => submit(Number(b.dataset.i), b)));
@@ -486,6 +510,7 @@ function runBattle(root, setup) {
     const again = !ok && ev.status === 'playing';
     const label = ev.status !== 'playing' ? 'けっかを見る ▶' : again ? '🔁 もういちど ちょうせん ▶' : 'つぎへ ▶';
     screenEl.classList.remove('is-order');
+    fitBanner();
     qpanel.innerHTML = `
       <div class="feedback ${ok ? 'ok' : 'ng'}" data-testid="feedback">
         <div class="fb-head">${head}</div>
@@ -607,6 +632,8 @@ function runBattle(root, setup) {
     destroyed = true;
     stopTimer();
     document.removeEventListener('visibilitychange', onVisibility);
+    bannerObserver.disconnect();
+    window.removeEventListener('resize', fitBanner);
   };
 }
 

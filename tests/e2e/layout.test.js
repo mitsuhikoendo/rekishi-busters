@@ -3,7 +3,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
-import { startEnv, goto, progressScript, LEVEL_DATA, clickAnswer, ROOT } from './helpers.js';
+import { startEnv, goto, progressScript, LEVEL_DATA, clickAnswer, passRetry, ROOT } from './helpers.js';
 import { ERA_IDS } from '../../data/eras.js';
 import { rubyPlain } from '../../js/ruby.js';
 
@@ -267,7 +267,8 @@ for (const size of SIZES) {
     for (let n = 0; n < 3; n++) {
       await clickAnswer(page, false, { lv: 1, era: 'jomon' });
       await page.clock.runFor(4000);
-      await page.click('[data-testid=next]');
+      if (n < 2) await passRetry(page, { scope: { lv: 1, era: 'jomon' }, clock: true });
+      else await page.click('[data-testid=next]');
     }
     await page.waitForSelector('[data-testid=lose]');
     await page.waitForTimeout(500);
